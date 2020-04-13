@@ -11,6 +11,48 @@ Crc16 crc;
 const char* message = "Hello, world";
 unsigned short crcValue = crc.XModemCrc(message, 0, strlen(message));
 
+int charsToBytes(const char* message, byte dest[], int start) {
+  int bytesWritten = 0;
+  for (byte* t = message; *t != '\0'; t++) {
+    dest[start++] = *t;
+    bytesWritten++;
+  }
+  return bytesWritten;
+}
+
+int shortToBytes(unsigned short data, byte dest[], int start) {
+  int sizeInBytes = sizeof(data);
+  int bytesWritten = 0;
+
+  for (int i = sizeInBytes; i > 0; i--) {
+    unsigned short shiftedData = data >> (8 * (i - 1));
+    byte dataByte = shiftedData & 0b11111111;
+    dest[start++] = dataByte;
+    bytesWritten++;
+  }
+  return bytesWritten;
+}
+
+struct out {
+  byte* data;
+  int size;
+};
+
+out toByte(const char* message) {
+  const int messageLengthSizeBytes = 2;
+  const int crcSizeBytes = 2;
+  const int messageSizeBytes = strlen(message);
+  int packetSizeBytes = messageLengthSizeBytes + messageSizeBytes + crcSizeBytes;
+  byte* packet = (byte*)malloc(sizeof(byte) * packetSizeBytes);
+
+  int w1 = shortToBytes((unsigned short)messageSizeBytes * 8, packet, 0);
+  int w2 = charsToBytes(message, packet, w1);
+  unsigned short crcData = crc.XModemCrc(packet, 0, w1 + w2);
+  int w3 = shortToBytes(crcData, packet, w1 + w2);
+
+  return out{packet, packetSizeBytes};
+}
+
 void setup() {
   pinMode(TX_CLOCK, OUTPUT);
   pinMode(TX_DATA, OUTPUT);
@@ -23,35 +65,21 @@ void setup() {
 
 // sendByte sends the input byte to TX_DATA one bit at the time
 void sendByte(byte input) {
-   for (int i = 0; i < 8; i++) {
-      bool toSend = input & (0b10000000 >> i);
+  for (int i = 0; i < 8; i++) {
+    bool toSend = input & (0b10000000 >> i);
 
-      digitalWrite(TX_DATA, toSend == false ? LOW : HIGH);
-      delay((1000 / TX_RATE) / 2);
+    digitalWrite(TX_DATA, toSend == false ? LOW : HIGH);
+    delay((1000 / TX_RATE) / 2);
 
-      digitalWrite(TX_CLOCK, HIGH);
-      delay((1000 / TX_RATE) / 2);
-      digitalWrite(TX_CLOCK, LOW);
-    }
-}
-
-// sendShort sends the input short to TX_DATA one bit at the time
-void sendShort(unsigned short data) {
-  int sizeInBytes = sizeof(data);
-
-  for (int i = sizeInBytes; i > 0; i--) {
-    unsigned short shiftedData = data >> (8 * (i - 1));
-    byte dataByte = shiftedData & 0b11111111;
-
-    sendByte(dataByte);
+    digitalWrite(TX_CLOCK, HIGH);
+    delay((1000 / TX_RATE) / 2);
+    digitalWrite(TX_CLOCK, LOW);
   }
 }
 
-// sendMessage sends the array of characters to TX_DATA one 
-// bit at the time
-void sendMessage(const char* message) {
-  for (byte* t = message; *t != '\0'; t++) {
-      sendByte(*t);
+void sendPacket(byte packet[], int size) {
+  for (int i = 0; i < size; i++) {
+    sendByte(packet[i]);
   }
 }
 
@@ -66,12 +94,12 @@ void loop() {
     digitalWrite(TX_CLOCK, LOW);
     done = true;
 
-    // send message size (number of bits)
-    sendShort(8 * strlen(message));
-    // send the actual message
-    sendMessage(message);
-    // send CRC of the message (size is not include in the CRC, but it should)
-    sendShort(crcValue);
+    out o = toByte(message);
+    for (int i = 0; i < o.size; i++) {
+      Serial.print(o.data[i], DEC);
+      Serial.print(" ");
+    }
+    sendPacket(o.data, o.size);
 
     digitalWrite(TX_DATA, LOW);
     digitalWrite(TX_CLOCK, LOW);

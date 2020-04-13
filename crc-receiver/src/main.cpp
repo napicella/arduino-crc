@@ -35,6 +35,19 @@ byte tickChar[] = {
     0b00000,
     0b00000};
 
+int shortToBytes(unsigned short data, byte dest[], int start) {
+  int sizeInBytes = sizeof(data);
+  int bytesWritten = 0;
+
+  for (int i = sizeInBytes; i > 0; i--) {
+    unsigned short shiftedData = data >> (8 * (i - 1));
+    byte dataByte = shiftedData & 0b11111111;
+    dest[start++] = dataByte;
+    bytesWritten++;
+  }
+  return bytesWritten;
+}
+
 void onClockRising() {
   if (initCompleted) {
     int bitIn = digitalRead(TX_DATA);
@@ -46,6 +59,11 @@ void onClockRising() {
         bitIndex = 0;
         readyForMessageSize = false;
         readyForMessage = true;
+        byte data[2]; 
+        shortToBytes(messageSize, data, 0);
+        crc.updateCrc(data[0]);
+        crc.updateCrc(data[1]);
+
         Serial.println(messageSize);
       } else {
         bitIndex++;
