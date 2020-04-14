@@ -20,6 +20,7 @@ char message[16];
 
 unsigned short messageSize = 0;
 int crcByteReceived = 0;
+int messageByteReceived = 0;
 bool readyForMessageSize = true;
 bool readyForMessage = false;
 bool readyForCrc = false;
@@ -71,8 +72,9 @@ void onClockRising() {
 
     } else if (readyForMessage) {
       rcvData = rcvData | (bitIn << (7 - bitIndex));
-
+      
       if (bitIndex == 7) {
+        messageByteReceived++;
         strncat(message, (const char *)&rcvData, 1);
         crc.updateCrc(rcvData);
         bitIndex = 0;
@@ -80,9 +82,10 @@ void onClockRising() {
       } else {
         bitIndex++;
       }
-      if (strlen(message) * 8 == messageSize) {
+      if (messageByteReceived * 8 == messageSize) {
         readyForMessage = false;
         readyForCrc = true;
+        messageByteReceived = 0;
       }
       updateLcd = true;
     } else if (readyForCrc) {
