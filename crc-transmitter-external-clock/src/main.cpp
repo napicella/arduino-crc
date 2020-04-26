@@ -88,7 +88,6 @@ void onClockRising() {
     Serial.println();
   }
   digitalWrite(TX_DATA, toSend == false ? LOW : HIGH);
-  //digitalWrite(TX_DATA, LOW);
 }
 
 void setup() {

@@ -9,8 +9,6 @@
 //Crc 16 library (XModem)
 Crc16 crc;
 
-// initialize the library with the numbers of the interface pins
-// LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
 LiquidCrystal595 lcd(5, 6, 7);
 volatile bool updateLcd = false;
 volatile bool initCompleted = false;
@@ -126,26 +124,6 @@ void onClockRising() {
   }
 }
 
-// waitStartTransmission waits until the CLOCK is HIGH for 500 ms.
-// This is the signal that the transmitter is ready to start
-// transmitting data.
-// void waitStartTransmission() {
-//   int maxCount = 20;
-//   while (!initCompleted) {
-//     for (int i = 1; i <= maxCount; i++) {
-//       int data = digitalRead(TX_CLOCK);
-//       if (data == LOW) {
-//         break;
-//       }
-//       delay(50);
-//       if (i == maxCount) {
-//         initCompleted = true;
-//         Serial.println("Init completed");
-//       }
-//     }
-//   }
-// }
-
 void setup() {
   // clear interrupt register, to make sure the handler does not get called
   // because of some garbage in the register
@@ -159,8 +137,6 @@ void setup() {
   lcd.setLED1Pin(HIGH);
   lcd.createChar(0, tickChar);
   lcd.begin(16, 2);
-
-  //waitStartTransmission();
 }
 
 void loop() {
