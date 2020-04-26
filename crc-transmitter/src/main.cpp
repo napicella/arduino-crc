@@ -4,7 +4,7 @@
 // CRC 16 library (XModem)
 Crc16 crc;
 // bits per seconds
-#define TX_RATE 10
+#define TX_RATE 500
 #define TX_CLOCK 2
 #define TX_DATA 3
 

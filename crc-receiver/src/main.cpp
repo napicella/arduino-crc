@@ -1,16 +1,17 @@
 #include <Arduino.h>
+#include "preamble.h"
 
 #define TX_CLOCK 2
 #define TX_DATA 3
 
 #include <Crc16.h>
-#include <LiquidCrystal.h>
+#include <LiquidCrystal595.h>
 //Crc 16 library (XModem)
 Crc16 crc;
 
 // initialize the library with the numbers of the interface pins
-LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
-
+// LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
+LiquidCrystal595 lcd(5, 6, 7);
 volatile bool updateLcd = false;
 volatile bool initCompleted = false;
 volatile byte rcvData = 0b0;
@@ -20,10 +21,10 @@ char message[16];
 
 unsigned short messageSize = 0;
 int crcByteReceived = 0;
-int messageByteReceived = 0;
-bool readyForMessageSize = true;
-bool readyForMessage = false;
-bool readyForCrc = false;
+volatile int messageByteReceived = 0;
+volatile bool readyForMessageSize = true;
+volatile bool readyForMessage = false;
+volatile bool readyForCrc = false;
 volatile int crcState = 0;
 
 byte tickChar[] = {
@@ -49,8 +50,17 @@ int shortToBytes(unsigned short data, byte dest[], int start) {
   return bytesWritten;
 }
 
+volatile bool preambleConcluded = false;
+
 void onClockRising() {
-  if (initCompleted) {
+  if (!preambleConcluded) {
+    if (detectPreamble(TX_DATA)) {
+      if (detectEnd(TX_DATA)) {
+        preambleConcluded = true;
+      }
+    }
+  } else {
+    // process message
     int bitIn = digitalRead(TX_DATA);
 
     if (readyForMessageSize) {
@@ -119,37 +129,38 @@ void onClockRising() {
 // waitStartTransmission waits until the CLOCK is HIGH for 500 ms.
 // This is the signal that the transmitter is ready to start
 // transmitting data.
-void waitStartTransmission() {
-  int maxCount = 20;
-  while (!initCompleted) {
-    for (int i = 1; i <= maxCount; i++) {
-      int data = digitalRead(TX_CLOCK);
-      if (data == LOW) {
-        break;
-      }
-      delay(50);
-      if (i == maxCount) {
-        initCompleted = true;
-        Serial.println("Init completed");
-      }
-    }
-  }
-}
+// void waitStartTransmission() {
+//   int maxCount = 20;
+//   while (!initCompleted) {
+//     for (int i = 1; i <= maxCount; i++) {
+//       int data = digitalRead(TX_CLOCK);
+//       if (data == LOW) {
+//         break;
+//       }
+//       delay(50);
+//       if (i == maxCount) {
+//         initCompleted = true;
+//         Serial.println("Init completed");
+//       }
+//     }
+//   }
+// }
 
 void setup() {
   // clear interrupt register, to make sure the handler does not get called
   // because of some garbage in the register
   EIFR = (1 << INTF1);
-  attachInterrupt(digitalPinToInterrupt(TX_CLOCK), onClockRising, RISING);
+  attachInterrupt(digitalPinToInterrupt(TX_CLOCK), onClockRising, FALLING);
   pinMode(TX_CLOCK, INPUT);
   pinMode(TX_DATA, INPUT);
 
   Serial.begin(9600);
   while (!Serial);
+  lcd.setLED1Pin(HIGH);
   lcd.createChar(0, tickChar);
   lcd.begin(16, 2);
 
-  waitStartTransmission();
+  //waitStartTransmission();
 }
 
 void loop() {
@@ -157,6 +168,7 @@ void loop() {
     updateLcd = false;
     lcd.setCursor(0, 0);
     lcd.print(message);
+    Serial.println(message);
     lcd.setCursor(0, 1);
 
     for (int i = 0; i < 8; i += 1) {
